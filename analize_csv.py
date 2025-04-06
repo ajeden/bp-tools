@@ -20,10 +20,14 @@ def parse_arguments():
     parser.add_argument('--end-date', help='Maximum date (inclusive) in YYYY-MM-DD format')
     return parser.parse_args()
 
-def read_and_merge_files(file_paths):
+def read_and_merge_files(file_paths,swap_cols=False):
     dfs = [pd.read_csv(file, parse_dates=[0]) for file in file_paths]
     combined_df = pd.concat(dfs, ignore_index=True)
     combined_df.drop_duplicates(inplace=True)
+    if swap_cols:
+        cols = combined_df.columns.tolist()
+        cols[1], cols[2] = cols[2], cols[1]
+        combined_df = combined_df[cols]
     return combined_df
 
 def filter_and_sort_data(df, datetime_col, start_date=None, end_date=None):
@@ -63,10 +67,10 @@ def generate_plot(df, stats_all, stats_before, stats_after, datetime_col, int_co
 
     # Create figure layout
     fig = plt.figure(figsize=(28, 20))
-    gs = gridspec.GridSpec(4, 1, height_ratios=[4.5, 1, 0.8, 0.8])
+    gs = gridspec.GridSpec(3, 2, height_ratios=[4.5, 1, 0.8])
 
     # Line plot
-    ax1 = plt.subplot(gs[0])
+    ax1 = plt.subplot(gs[0,:])
     for idx, col in enumerate(int_cols):
         linestyle = ':' if idx == 2 else '-'
         ax1.plot(daily_avg.index, daily_avg[col], label=col, linestyle=linestyle)
@@ -86,7 +90,7 @@ def generate_plot(df, stats_all, stats_before, stats_after, datetime_col, int_co
     ax1.grid(True)
     plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45)
 
-    def add_table(ax, stats_df, title, labels_bg_color):
+    def add_table(ax, stats_df, title, labels_bg_color, scaleX=0.2):
         ax.axis('off')
         ax.text(0.5, 0.95,title, fontsize=14, 
                 ha='center',va='bottom',
@@ -98,7 +102,7 @@ def generate_plot(df, stats_all, stats_before, stats_after, datetime_col, int_co
                          colLabels=stats_df.columns,
                          cellLoc='center',
                          loc='center')
-        table.scale(0.6, 1.2)
+        table.scale(scaleX, 1.2)
         table.auto_set_font_size(False)
         table.set_fontsize(12)
 
@@ -110,14 +114,14 @@ def generate_plot(df, stats_all, stats_before, stats_after, datetime_col, int_co
                 cell.get_text().set_color("white")  # White text
 
     # Add all 3 summary tables
-    ax2 = plt.subplot(gs[1])
+    ax2 = plt.subplot(gs[1,:])
     add_table(ax2, stats_all, "📊 Summary: All Rows","#444444" )
 
-    ax3 = plt.subplot(gs[2])
-    add_table(ax3, stats_before, "🌅 Summary: Before Midday","#009944")
+    ax3 = plt.subplot(gs[2,0])
+    add_table(ax3, stats_before, "🌅 Summary: Before Midday","#009944",0.5)
 
-    ax4 = plt.subplot(gs[3])
-    add_table(ax4, stats_after, "🌇 Summary: After Midday","#004499")
+    ax4 = plt.subplot(gs[2,1])
+    add_table(ax4, stats_after, "🌇 Summary: After Midday","#004499",0.5)
 
     plt.tight_layout()
     plt.savefig(output_image)
@@ -146,7 +150,7 @@ def export_summaries_to_txt(output_path, summaries):
 def main():
     args = parse_arguments()
 
-    df = read_and_merge_files(args.input)
+    df = read_and_merge_files(args.input,True)
     datetime_col = df.columns[0]
     int_cols = df.columns[1:4]
 
