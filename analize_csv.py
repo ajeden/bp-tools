@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.dates as mdates
+import xlsxwriter
 import subprocess
 import sys
 import os
@@ -20,14 +21,43 @@ def parse_arguments():
     parser.add_argument('--end-date', help='Maximum date (inclusive) in YYYY-MM-DD format')
     return parser.parse_args()
 
-def read_and_merge_files(file_paths,swap_cols=False):
-    dfs = [pd.read_csv(file, parse_dates=[0]) for file in file_paths]
+def read_and_merge_files(file_paths, swap_cols=False):
+    dfs = []
+    for file in file_paths:
+        try:
+            df = pd.read_csv(file)
+
+            # Validate there are at least 4 columns
+            if df.shape[1] < 4:
+                print(f"⚠️ Skipping file {file}: less than 4 columns")
+                continue
+
+            # Parse column 0 as datetime (coerce errors)
+            datetime_col = df.columns[0]
+            df[datetime_col] = pd.to_datetime(df[datetime_col], errors='coerce')
+
+            # Parse columns 1-3 as integers (coerce errors)
+            for col in df.columns[1:4]:
+                df[col] = pd.to_numeric(df[col], errors='coerce', downcast='integer')
+
+            # Drop any row with invalid datetime or integer values
+            df.dropna(subset=[df.columns[0], df.columns[1], df.columns[2], df.columns[3]], inplace=True)
+
+            dfs.append(df)
+
+        except Exception as e:
+            print(f"⚠️ Error reading {file}: {e}")
+
+    # Combine all cleaned DataFrames
     combined_df = pd.concat(dfs, ignore_index=True)
     combined_df.drop_duplicates(inplace=True)
-    if swap_cols:
+
+    # Optional column swap: columns 1 and 2
+    if swap_cols and combined_df.shape[1] >= 3:
         cols = combined_df.columns.tolist()
         cols[1], cols[2] = cols[2], cols[1]
         combined_df = combined_df[cols]
+
     return combined_df
 
 def filter_and_sort_data(df, datetime_col, start_date=None, end_date=None):
@@ -145,7 +175,75 @@ def export_summaries_to_txt(output_path, summaries):
         f.write("📊 All Rows:\n" + summaries['all'] + "\n\n")
         f.write("🌅 Before Midday:\n" + summaries['before'] + "\n\n")
         f.write("🌇 After Midday:\n" + summaries['after'] + "\n")
-    print(f"\n📝 Summaries exported to: {txt_path}")
+    print(f"\n📝Summaries exported to: {txt_path}")
+
+def export_to_excel_with_chart(output_path, df, stats_all, stats_before, stats_after):
+    excel_path = os.path.splitext(output_path)[0] + ".xlsx"
+
+    # Compute daily averages for chart
+    df['date_only'] = df[df.columns[0]].dt.date
+    daily_avg = df.groupby('date_only')[df.columns[1:4]].mean().reset_index()
+
+    with pd.ExcelWriter(excel_path, engine='xlsxwriter', datetime_format='yyyy-mm-dd') as writer:
+        workbook = writer.book
+
+        # === Sheet 1: Full Data ===
+        df.to_excel(writer, sheet_name='Data', index=False)
+
+        # === Sheet 2: Summary Tables ===
+        summary_ws = workbook.add_worksheet('Summary')
+        writer.sheets['Summary'] = summary_ws
+
+        # Write each summary as a real table
+        def write_df(ws, start_row, start_col, title, df_stats):
+            ws.write(start_row, start_col, title, workbook.add_format({'bold': True, 'font_size': 12}))
+            for col_idx, col_name in enumerate(df_stats.columns):
+                ws.write(start_row + 1, start_col + 1 + col_idx, col_name, workbook.add_format({'bold': True}))
+            for row_idx, row_name in enumerate(df_stats.index):
+                ws.write(start_row + 2 + row_idx, start_col, row_name, workbook.add_format({'bold': True}))
+                for col_idx, col_name in enumerate(df_stats.columns):
+                    ws.write(start_row + 2 + row_idx, start_col + 1 + col_idx, df_stats.iloc[row_idx, col_idx])
+
+        write_df(summary_ws, 0, 0, '📊 Summary: All Rows', stats_all)
+        write_df(summary_ws, 10, 0, '🌅 Summary: Before Midday', stats_before)
+        write_df(summary_ws, 20, 0, '🌇 Summary: After Midday', stats_after)
+
+        # === Sheet 3: Chart Data ===
+        chart_ws = workbook.add_worksheet('ChartData')
+        writer.sheets['ChartData'] = chart_ws
+
+        date_format = workbook.add_format({'num_format': 'YYYY-MM-DD'})
+
+        # Write headers
+        chart_ws.write_row('A1', daily_avg.columns)
+
+        # Write data with date formatting
+        for i, row in daily_avg.iterrows():
+            formatted_date = pd.to_datetime(row.iloc[0]).strftime('%Y-%d-%m')
+            chart_ws.write(i + 1, 0, formatted_date)
+            for j in range(1, len(row)):
+                chart_ws.write(i + 1, j, row.iloc[j])
+
+        # === Create Excel chart ===
+        chart = workbook.add_chart({'type': 'line'})
+
+        for i, col_name in enumerate(daily_avg.columns[1:]):
+            chart.add_series({
+                'name':       ['ChartData', 0, i + 1],
+                'categories': ['ChartData', 1, 0, len(daily_avg), 0],  # X axis = dates
+                'values':     ['ChartData', 1, i + 1, len(daily_avg), i + 1],
+                'line':       {'dash_type': 'dot'} if i == 2 else {},
+            })
+
+        chart.set_title({'name': 'Daily Averages'})
+        chart.set_x_axis({'name': 'Date', 'date_axis': True})
+        chart.set_y_axis({'name': 'Average Value'})
+        chart.set_legend({'position': 'bottom'})
+
+        # Insert chart into Summary sheet
+        summary_ws.insert_chart('H3', chart, {'x_scale': 2, 'y_scale': 2})
+
+    print(f"✅ Excel file with proper tables and chart exported to: {excel_path}")
 
 def main():
     args = parse_arguments()
@@ -156,7 +254,7 @@ def main():
 
     df = filter_and_sort_data(df, datetime_col, args.start_date, args.end_date)
 
-    df.to_csv(args.output, index=False)
+    df.to_csv(os.path.splitext(args.output)[0] + ".csv", index=False)
     print(f"\n💾 Sorted and merged CSV saved as '{args.output}'")
 
     stats_all, stats_all_str = generate_statistics(df, int_cols, "all rows")
@@ -173,13 +271,15 @@ def main():
 
     output_image = os.path.splitext(args.output)[0] + ".png"
     generate_plot(df, stats_all, stats_before, stats_after, datetime_col, int_cols, output_image)
-    open_image(output_image)
+    # open_image(output_image)
 
     export_summaries_to_txt(args.output, {
         "all": stats_all_str,
         "before": stats_before_str,
         "after": stats_after_str
     })
+
+    export_to_excel_with_chart(args.output, df, stats_all, stats_before, stats_after)
 
 if __name__ == "__main__":
     main()

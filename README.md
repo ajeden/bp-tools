@@ -30,6 +30,7 @@ This Python script processes and visualizes time-series CSV data. It includes th
 
 - 📄 **Exports a textual report**
   - Saves a `.txt` file with all 3 summary tables
+  - Saves a `.xslx` file with all data and plot
 
 
 # Usage
@@ -42,7 +43,11 @@ where:
 
 `-i INPUT` is a list of CSV files to process
 
-`-o OUTPUT` is a CSV file to be outputted with sorted, deduplicated rows along with PNG plot and summary
+`-o OUTPUT` is a filename to be outputted:
+- CSV with sorted, deduplicated rows 
+- PNG plot and summary
+- TXT summaries
+- XSLX Excel file with all above
 
 optionally:
 
@@ -71,7 +76,7 @@ python analyze_csv.py -i input1.csv input2.csv -o merged_output.csv --start-date
 ## Required Python libs
 Install the following libraries:
 ```bash
-pip install pandas matplotlib colorama
+pip install pandas matplotlib colorama xlsxwriter
 ```
 
 # Extra script `download_and_analyze.py`
