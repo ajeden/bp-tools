@@ -184,7 +184,7 @@ def export_to_excel_with_chart(output_path, df, stats_all, stats_before, stats_a
     df['date_only'] = df[df.columns[0]].dt.date
     daily_avg = df.groupby('date_only')[df.columns[1:4]].mean().reset_index()
 
-    with pd.ExcelWriter(excel_path, engine='xlsxwriter', datetime_format='yyyy-mm-dd') as writer:
+    with pd.ExcelWriter(excel_path, engine='xlsxwriter', datetime_format='YYYY-MM-DD') as writer:
         workbook = writer.book
 
         # === Sheet 1: Full Data ===
@@ -219,7 +219,7 @@ def export_to_excel_with_chart(output_path, df, stats_all, stats_before, stats_a
 
         # Write data with date formatting
         for i, row in daily_avg.iterrows():
-            formatted_date = pd.to_datetime(row.iloc[0]).strftime('%Y-%d-%m')
+            formatted_date = pd.to_datetime(row.iloc[0]).strftime('%Y-%m-%d')
             chart_ws.write(i + 1, 0, formatted_date)
             for j in range(1, len(row)):
                 chart_ws.write(i + 1, j, row.iloc[j])
