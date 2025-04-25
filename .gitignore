@@ -37,6 +37,7 @@ config.ini
 *.png
 *.xlsx
 *.txt
+.~*
 !requirements.txt
 
 # External dependencies
