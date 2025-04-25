@@ -83,6 +83,110 @@ pip install pandas matplotlib colorama xlsxwriter
 This is quick and dirty script to download data from my devices and run the analysis.
 The script `download_and_analyze.py` relays on having [Omblepy](https://github.com/userx14/omblepy) handy with Omron devices already paired with your computer. See Omblepy's readme for details on how to do that.
 
+# BP Tools
+
+A set of tools for downloading and analyzing blood pressure data from Omron devices.
+
+## Features
+
+- Download data from Omron M7 and Evolv blood pressure monitors
+- Support for multiple users on M7 device (user1 and user2)
+- Generate comprehensive analysis including:
+  - CSV files with merged data
+  - PNG files with graphs
+  - Excel files with tables and charts
+  - TXT files with statistical summaries
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/bp-tools.git
+cd bp-tools
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Clone the omblepy repository:
+```bash
+git clone https://github.com/userx14/omblepy.git omblepy-main
+```
+so it is cloned to omblepy-main subdirectory.
+
+4. Configure your devices:
+   - Copy `config.ini.template` to `config.ini`
+   - Edit `config.ini` with your device MAC addresses
+   - For M7 device, you can specify the user (user1 or user2)
+
+## Usage
+
+### Download and Analyze Data
+
+To download data from devices and analyze:
+
+```bash
+# For M7 device (default user1)
+python download_and_analyse.py M7
+
+# For M7 device with specific user
+python download_and_analyse.py M7 --m7-user user2
+
+# For Evolv device
+python download_and_analyse.py Evolv
+
+# For both devices
+python download_and_analyse.py both
+
+# For both devices with specific M7 user
+python download_and_analyse.py both --m7-user user2
+```
+
+### Analyze Existing Data
+
+To analyze existing CSV files without downloading new data:
+
+```bash
+python download_and_analyse.py none
+```
+
+### Command Line Arguments
+
+- `platform`: Choose platform to analyze (M7, Evolv, both, none)
+- `--m7-mac`: MAC address for M7 device (format: XX:XX:XX:XX:XX:XX)
+- `--evolv-mac`: MAC address for Evolv device (format: XX:XX:XX:XX:XX:XX)
+- `--m7-user`: User selection for M7 device (user1 or user2)
+
+## Configuration
+
+Edit `config.ini` to set your device MAC addresses and M7 user preference:
+
+```ini
+[devices]
+# M7 device MAC address (format: XX:XX:XX:XX:XX:XX)
+M7_mac = YOUR-M7-MAC-HERE
+# M7 user selection (user1 or user2)
+M7_user = user1
+
+# Evolv device MAC address (format: XX:XX:XX:XX:XX:XX)
+Evolv_mac = YOUR-EVOLV-MAC-HERE
+```
+
+## Finding Device MAC Addresses
+
+1. Enable Bluetooth on your device
+2. Put the Omron device in pairing mode
+3. Use Windows Settings > Bluetooth & devices to see available devices
+4. The MAC address will be shown in the device properties
+
+You can also find your device MAC addresses through omblepy, see "Pairing for Universal Blood Pressure Manager (UBPM)" in Omblepy README file.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
 
 
 

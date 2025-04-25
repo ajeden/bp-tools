@@ -180,9 +180,10 @@ def export_summaries_to_txt(output_path, summaries):
 def export_to_excel_with_chart(output_path, df, stats_all, stats_before, stats_after):
     excel_path = os.path.splitext(output_path)[0] + ".xlsx"
 
-    # Compute daily averages for chart
+    # Compute daily averages and standard deviations for chart
     df['date_only'] = df[df.columns[0]].dt.date
     daily_avg = df.groupby('date_only')[df.columns[1:4]].mean().reset_index()
+    daily_std = df.groupby('date_only')[df.columns[1:4]].std().reset_index()
 
     with pd.ExcelWriter(excel_path, engine='xlsxwriter', datetime_format='YYYY-MM-DD') as writer:
         workbook = writer.book
@@ -216,6 +217,7 @@ def export_to_excel_with_chart(output_path, df, stats_all, stats_before, stats_a
 
         # Write headers
         chart_ws.write_row('A1', daily_avg.columns)
+        chart_ws.write_row('E1', [f"{col}_std" for col in daily_avg.columns[1:]])
 
         # Write data with date formatting
         for i, row in daily_avg.iterrows():
@@ -223,9 +225,14 @@ def export_to_excel_with_chart(output_path, df, stats_all, stats_before, stats_a
             chart_ws.write(i + 1, 0, formatted_date)
             for j in range(1, len(row)):
                 chart_ws.write(i + 1, j, row.iloc[j])
+                # Write standard deviation data
+                chart_ws.write(i + 1, j + 3, daily_std.iloc[i, j])
 
         # === Create Excel chart ===
         chart = workbook.add_chart({'type': 'line'})
+
+        # Define colors for each series
+        colors = ['#1f77b4', '#ff2200', '#2ca02c']  # Blue, Red, Green
 
         for i, col_name in enumerate(daily_avg.columns[1:]):
             chart.add_series({
@@ -233,9 +240,16 @@ def export_to_excel_with_chart(output_path, df, stats_all, stats_before, stats_a
                 'categories': ['ChartData', 1, 0, len(daily_avg), 0],  # X axis = dates
                 'values':     ['ChartData', 1, i + 1, len(daily_avg), i + 1],
                 'line':       {'dash_type': 'dot'} if i == 2 else {},
+                'y_error_bars': {
+                    'type': 'standard_error',
+                    'plus_values': ['ChartData', 1, i + 4, len(daily_avg), i + 4],
+                    'minus_values': ['ChartData', 1, i + 4, len(daily_avg), i + 4],
+                    'end_style': 0,  # No end cap
+                    'line': {'color': colors[i], 'transparency': 50}
+                }
             })
 
-        chart.set_title({'name': 'Daily Averages'})
+        chart.set_title({'name': 'Daily Averages with Error Bars'})
         chart.set_x_axis({'name': 'Date', 'date_axis': True})
         chart.set_y_axis({'name': 'Average Value'})
         chart.set_legend({'position': 'bottom'})
@@ -243,7 +257,7 @@ def export_to_excel_with_chart(output_path, df, stats_all, stats_before, stats_a
         # Insert chart into Summary sheet
         summary_ws.insert_chart('H3', chart, {'x_scale': 2, 'y_scale': 2})
 
-    print(f"✅ Excel file with proper tables and chart exported to: {excel_path}")
+    print(f"✅ Excel file with proper tables and chart with error bars exported to: {excel_path}")
 
 def main():
     args = parse_arguments()

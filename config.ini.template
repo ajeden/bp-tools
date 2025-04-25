@@ -1,0 +1,11 @@
+[devices]
+# MAC addresses for your Omron devices
+# Format should be XX:XX:XX:XX:XX:XX
+M7_mac = YOUR-M7-MAC-HERE
+# M7 user selection (user1 or user2)
+M7_user = user1
+Evolv_mac = YOUR-EVOLV-MAC-HERE
+
+# Example:
+# M7_mac = 11:22:33:44:55:66
+# Evolv_mac = AA:BB:CC:DD:EE:FF 
