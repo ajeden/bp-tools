@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.dates as mdates
 import xlsxwriter
+from xlsxwriter.utility import xl_rowcol_to_cell
 import subprocess
 import sys
 import os
@@ -121,7 +122,8 @@ def generate_statistics(df, int_cols, label):
 def generate_plot(df, stats_all, stats_morning, stats_midday, stats_evening, datetime_col, int_cols, output_image):
     # Prepare data for plotting (Daily Averages)
     df['date_only'] = df[datetime_col].dt.date
-    daily_avg = df.groupby('date_only')[int_cols].mean()
+    # Aggregating mean and std for error bars
+    daily_avg = df.groupby('date_only')[int_cols].agg(['mean', 'std'])
     
     # Filter daily avg for periods if possible? 
     # Actually, for the daily charts (Morn/Mid/Eve), we should ideally plot the *period* averages, not just total daily.
@@ -139,10 +141,11 @@ def generate_plot(df, stats_all, stats_morning, stats_midday, stats_evening, dat
              subset = df[(df[datetime_col].dt.hour >= hour_min) & (df[datetime_col].dt.hour < hour_max)].copy()
         
         if subset.empty:
-            return pd.DataFrame(columns=int_cols)
+            # Return empty structure matching the agg result
+            return pd.DataFrame(columns=pd.MultiIndex.from_product([int_cols, ['mean', 'std']]))
             
         subset['date_only'] = subset[datetime_col].dt.date
-        return subset.groupby('date_only')[int_cols].mean()
+        return subset.groupby('date_only')[int_cols].agg(['mean', 'std'])
 
     # Data Source for Charts
     data_all = daily_avg # Overall Daily Average
@@ -170,7 +173,16 @@ def generate_plot(df, stats_all, stats_morning, stats_midday, stats_evening, dat
             linestyle = '-'
             marker = 'o'
             if idx == 2: linestyle = ':' # Pulse
-            ax.plot(data.index, data[col], label=col, linestyle=linestyle, marker=marker, color=colors[idx])
+            
+            # Extract mean and std. If std is NaN (one point), fill with 0
+            means = data[col]['mean']
+            stds = data[col]['std'].fillna(0)
+            
+            # ax.errorbar replaces ax.plot
+            # capsize=3 adds the horizontal lines at the end of error bars
+            ax.errorbar(data.index, means, yerr=stds, label=col, 
+                        linestyle=linestyle, marker=marker, color=colors[idx],
+                        capsize=3, alpha=0.9)
 
         locator = mdates.AutoDateLocator(minticks=5, maxticks=10)
         ax.xaxis.set_major_locator(locator)
@@ -445,8 +457,8 @@ def export_to_excel_with_chart(output_path, df, stats_all, stats_morning, stats_
                     'marker':     {'type': 'circle', 'size': 5},
                     'y_error_bars': {
                         'type': 'custom',
-                        'plus_values':  [val_sheet, val_row_start, val_err_col_start+i, val_row_end, val_err_col_start+i],
-                        'minus_values': [val_sheet, val_row_start, val_err_col_start+i, val_row_end, val_err_col_start+i],
+                        'plus_values':  f"='{val_sheet}'!{xl_rowcol_to_cell(val_row_start, val_err_col_start+i)}:{xl_rowcol_to_cell(val_row_end, val_err_col_start+i)}",
+                        'minus_values': f"='{val_sheet}'!{xl_rowcol_to_cell(val_row_start, val_err_col_start+i)}:{xl_rowcol_to_cell(val_row_end, val_err_col_start+i)}",
                         'line':         {'color': '#808080', 'transparency': 50}
                     }
                 })
