@@ -82,7 +82,8 @@ def main():
                       help="Choose platform to analyze: M7 or Evolv or both, none if you just want to take input files for analysis")
     parser.add_argument('--m7-mac', help="MAC address for M7 device (format: XX:XX:XX:XX:XX:XX)")
     parser.add_argument('--evolv-mac', help="MAC address for Evolv device (format: XX:XX:XX:XX:XX:XX)")
-    parser.add_argument('--m7-user', choices=["user1", "user2"], help="Select which user's data to use for M7 device (default: user1)")
+    parser.add_argument('-u', '--m7-user', '--M7-user', dest='m7_user', choices=["user1", "user2"], 
+                      help="Select which user's data to use for M7 device (default: user1)")
     args = parser.parse_args()
 
     today_str = datetime.now().strftime("%Y-%m-%d")
